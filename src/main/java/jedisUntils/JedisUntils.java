@@ -2,7 +2,9 @@ package jedisUntils;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import com.sun.org.apache.xerces.internal.impl.xs.SchemaGrammar.Schema4Annotations;
@@ -10,10 +12,11 @@ import com.sun.org.apache.xerces.internal.impl.xs.SchemaGrammar.Schema4Annotatio
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
+import redis.clients.jedis.Pipeline;
 import redis.clients.jedis.ScanParams;
 import redis.clients.jedis.ScanResult;
 
-public class JedisUntils extends ScanParams{
+public class JedisUntils {
 	private JedisPool jedispool;
 	private Jedis jedis;
 	//Redis服务器IP
@@ -50,21 +53,12 @@ public class JedisUntils extends ScanParams{
     //在return一个jedis实例时，是否提前进行validate操作；如果为true，则得到的jedis实例均是可用的；
     private static final boolean TEST_ON_RETURN = true;
 
-	
-	
-	
-@Override
-	public Collection<byte[]> getParams() {
-		// TODO Auto-generated method stub
-		return super.getParams();
-	}
-
 /**
  * 初始化数据据库连接池
  * 配置相关信息参数
  */
-    JedisPoolConfig config = new JedisPoolConfig();
 	{
+		JedisPoolConfig config = new JedisPoolConfig();
 		config.setBlockWhenExhausted(IS_BLOCK);
 		config.setMaxTotal(MAX_ACTIVE);
 		config.setMaxIdle(MAX_IDLE);
@@ -136,7 +130,17 @@ public class JedisUntils extends ScanParams{
 		return nodesId;
 	}
 	
-	public String[] pipelineWithSet(){
+	public String[] pipelineWithSet(Map<String,String> map){
+		jedis =getResource();
+		Pipeline p  = jedis.pipelined();
+		Iterator it = map.entrySet().iterator();
+		  while (it.hasNext()) {
+		   Map.Entry entry = (Map.Entry) it.next();
+		   String key = (String) entry.getKey();
+		   String value = (String) entry.getValue();
+		   p.set(key, value);
+		  }
+		
 		return null;
 	}
 	
