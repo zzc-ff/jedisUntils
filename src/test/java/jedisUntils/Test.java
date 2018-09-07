@@ -6,6 +6,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import redis.clients.jedis.Jedis;
+
 public class Test {
 
 	@org.junit.Test
@@ -20,7 +22,7 @@ public class Test {
 	@org.junit.Test
 	public void testKeys() {
 		JedisUntils ju = new JedisUntils();
-		Map<String ,List<String>> map = ju.keys("*");
+		Map<String ,List<String>> map = ju.keys("QQQ*QQQ");
 		Iterator<String> it = map.keySet().iterator();
 		while(it.hasNext()){
 			System.out.println(it.next()+":"+map.get(it.next()));
@@ -55,7 +57,7 @@ public class Test {
 		map.put("ccc", "ccc");
 		List<Object> list = j.pipelineWithSet(map);
 		for (Object o : list) {
-			System.out.println((String) o);
+			System.out.println(String.valueOf(o));
 		}
 	}
 
@@ -97,6 +99,12 @@ public class Test {
 		while(it.hasNext()){
 			System.out.println(it.next()+":"+map.get(it.next()).size());
 		}
+	}
+	
+	@org.junit.Test
+	public void testget() {
+		JedisUntils j = new JedisUntils();
+		System.out.println(j.get("ccc"));
 	}
 
 }
