@@ -6,8 +6,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
-import redis.clients.jedis.Jedis;
-
 public class Test {
 
 	@org.junit.Test
@@ -22,7 +20,7 @@ public class Test {
 	@org.junit.Test
 	public void testKeys() {
 		JedisUntils ju = new JedisUntils();
-		Map<String ,List<String>> map = ju.keys("QQQ*QQQ");
+		Map<String ,List<String>> map = ju.keys("*");
 		Iterator<String> it = map.keySet().iterator();
 		while(it.hasNext()){
 			System.out.println(it.next()+":"+map.get(it.next()));
@@ -106,5 +104,16 @@ public class Test {
 		JedisUntils j = new JedisUntils();
 		System.out.println(j.get("ccc"));
 	}
-
+	
+	@org.junit.Test
+	public void testFileUntil(){
+		Boolean path = FileUntil.FileUntil.getBooleanProperties("src/main/resources/jedis.properties", "test");
+		System.out.println(path);
+	}
+	
+	@org.junit.Test
+	public void test(){
+		JedisUntils j = new JedisUntils();
+		j.get("zzc");
+	}
 }

@@ -5,7 +5,7 @@ import redis.clients.jedis.Protocol.Command;
 
 public class NewConnection  extends Connection{
 	public NewConnection() {
-		super("140.143.161.103", 6379);
+		super("192.168.224.128", 6379);
 	}
 	
 	
