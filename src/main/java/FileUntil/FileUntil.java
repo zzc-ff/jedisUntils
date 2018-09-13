@@ -11,7 +11,7 @@ public class FileUntil {
 	/**
 	 * 根据key读取value
 	 * 
-	 * @Title: getProperties_2 @Description: 第二种方式：使用缓冲输入流读取配置文件，然后将其加载，再按需操作
+	 * @Title: 使用缓冲输入流读取配置文件，然后将其加载，再按需操作
 	 *         绝对路径或相对路径， 如果是相对路径，则从当前项目下的目录开始计算，
 	 *         如：当前项目路径/config/config.properties, 相对路径就是config/config.properties
 	 * 
@@ -29,6 +29,9 @@ public class FileUntil {
 			prop.load(InputStream);
 			// 根据关键字获取value值
 			value = prop.getProperty(keyWord);
+			if(value == null){
+				throw new NullPointerException();
+			}
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -45,6 +48,9 @@ public class FileUntil {
 			prop.load(InputStream);
 			// 根据关键字获取value值
 			value = prop.getProperty(keyWord);
+			if(value == null){
+				throw new NullPointerException();
+			}
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -61,6 +67,9 @@ public class FileUntil {
 			prop.load(InputStream);
 			// 根据关键字获取value值
 			value = prop.getProperty(keyWord);
+			if(value == null){
+				throw new NullPointerException();
+			}
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

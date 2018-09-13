@@ -18,22 +18,6 @@ public class Test {
 	}
 
 	@org.junit.Test
-	public void testKeys() {
-		JedisUntils ju = new JedisUntils();
-		Map<String ,List<String>> map = ju.keys("*");
-		Iterator<String> it = map.keySet().iterator();
-		while(it.hasNext()){
-			System.out.println(it.next()+":"+map.get(it.next()));
-		}
-	}
-
-	@org.junit.Test
-	public void testKeyss() {
-		JedisUntils j = new JedisUntils();
-		System.out.println(j.keys("*"));
-	}
-
-	@org.junit.Test
 	public void testPipeline() {
 		JedisUntils j = new JedisUntils();
 		List<String> list = new LinkedList<String>();
@@ -68,6 +52,17 @@ public class Test {
 			System.out.println(it.next()+":"+map.get(it.next()).size());
 		}
 	}
+	
+	@org.junit.Test
+	public void testKeys() {
+		JedisUntils ju = new JedisUntils();
+		Map<String ,List<String>> map = ju.keys("*");
+		Iterator<String> it = map.keySet().iterator();
+		while(it.hasNext()){
+			System.out.println(it.next()+":"+map.get(it.next()));
+		}
+	}
+
 	
 	@org.junit.Test
 	public void testscanWithPattern() {
@@ -107,7 +102,7 @@ public class Test {
 	
 	@org.junit.Test
 	public void testFileUntil(){
-		Boolean path = FileUntil.FileUntil.getBooleanProperties("src/main/resources/jedis.properties", "test");
+		String path = FileUntil.FileUntil.getStringProperties("src/main/resources/jedis.properties", "path");
 		System.out.println(path);
 	}
 	

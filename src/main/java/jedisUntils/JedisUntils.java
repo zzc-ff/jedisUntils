@@ -19,18 +19,16 @@ import redis.clients.jedis.Pipeline;
 import redis.clients.jedis.Protocol;
 import redis.clients.jedis.Protocol.Command;
 import redis.clients.jedis.Response;
-import redis.clients.jedis.ScanParams;
 import redis.clients.jedis.exceptions.JedisConnectionException;
 import redis.clients.util.SafeEncoder;
 
 public class JedisUntils {
 
-	NewConnection conn = new NewConnection();
 	private static Logger logger = Logger.getLogger(JedisUntils.class);
 
 	public final static String SCAN_POINTER_START = String.valueOf(0);
-	private final static String PATH = "src/main/resources/jedis.properties";
-	
+	public final static String PATH = "src/main/resources/jedis.properties";
+
 	// Redis服务器IP
 	private static final String IP = FileUntil.FileUntil.getStringProperties(PATH, "ip");
 	// Redis的端口号
@@ -56,6 +54,7 @@ public class JedisUntils {
 	private static final boolean TEST_ON_RETURN = FileUntil.FileUntil.getBooleanProperties(PATH, "testOnReturn");
 
 	private static JedisPool jedisPool = null;
+	NewConnection conn = null;
 
 	/**
 	 * 初始化Redis连接池
@@ -86,9 +85,19 @@ public class JedisUntils {
 				jedis = jedisPool.getResource();
 			}
 		} catch (Exception e) {
-			logger.error("Get jedis error : " + e);
+			logger.error(
+					"Get jedis error : " + e + "(Intenet disconnection or password is not right or port is not right)");
 		}
 		return jedis;
+	}
+
+	/**
+	 * 同步获取Jedis实例
+	 * 
+	 * @return Jedis
+	 */
+	public static synchronized NewConnection getNewConnection() {
+		return new NewConnection();
 	}
 
 	/**
@@ -100,25 +109,6 @@ public class JedisUntils {
 		if (jedis != null && jedisPool != null) {
 			jedis.close();
 		}
-	}
-
-	/**
-	 * 将clusterNodes读出节点信息,截取出nodesId
-	 * 
-	 * @return 字符数组 将截取的nodesId放在数组中返回
-	 */
-	public String[] clusterNodes() {
-		int start = 0;
-		Jedis jedis = getJedis();
-		String nodes = jedis.clusterNodes();
-		String[] nodesIdTemp = nodes.split("\n");
-		String[] nodesId = new String[nodesIdTemp.length];
-		for (int i = 0; i < nodesIdTemp.length; i++) {
-			int iIndex = nodesIdTemp[i].indexOf(" ");
-			nodesId[i] = nodesIdTemp[i].substring(start, iIndex);
-		}
-		returnResource(jedis);
-		return nodesId;
 	}
 
 	/**
@@ -136,7 +126,7 @@ public class JedisUntils {
 	}
 
 	/**
-	 * set方法并设定key有效时间
+	 * set方法 并设定key有效时间
 	 * 
 	 * @param key
 	 * @param value
@@ -165,7 +155,7 @@ public class JedisUntils {
 	}
 
 	/**
-	 * 对pipeline 进行批量的set
+	 * 对pipeline 进行批量的set（有效时间2分钟）
 	 * 
 	 * @param map
 	 * @return list集合
@@ -179,7 +169,7 @@ public class JedisUntils {
 			String key = (String) entry.getKey();
 			String value = (String) entry.getValue();
 			p.set(key, value);
-			p.expire(key, 120);
+			// p.expire(key, 120);
 		}
 		List<Object> resultList = p.syncAndReturnAll();
 		return resultList;
@@ -213,6 +203,33 @@ public class JedisUntils {
 	}
 
 	/**
+	 * 将clusterNodes读出节点信息,截取出nodesId
+	 * 
+	 * @return 字符数组 将截取的nodesId放在数组中返回
+	 */
+	public String[] clusterNodes() {
+		conn = getNewConnection();
+		int start = 0;
+		String[] nodesId = null;
+		try {
+			conn.sendCommand(Command.AUTH, AUTH);
+			conn.getStatusCodeReply();
+			// System.out.println(strStatus);
+			conn.sendCommand(Command.CLUSTER, "nodes");
+			String strNodeList = conn.getBulkReply();
+			String[] nodeList = strNodeList.split("\n");
+			nodesId = new String[nodeList.length];
+			for (int i = 0; i < nodeList.length; i++) {
+				nodesId[i] = nodeList[i].substring(start, nodeList[i].indexOf(" "));
+			}
+		} catch (JedisConnectionException e) {
+			e.printStackTrace();
+			logger.error("get cluster nodes error");
+		}
+		return nodesId;
+	}
+
+	/**
 	 * keys命令封裝，在检索的keys 命令后面加上检索的node id
 	 * 
 	 * @param pattern
@@ -221,26 +238,21 @@ public class JedisUntils {
 	public Map<String, List<String>> keys(String pattern) {
 		Map<String, List<String>> resultMap;
 		try {
-			conn.sendCommand(Command.AUTH, AUTH);
-			String authReply = conn.getStatusCodeReply();
-			if ("ok".equalsIgnoreCase(authReply)) {
-				String[] nodeArray = clusterNodes();
-				List<String> keyList;
-				resultMap = new HashMap<String, List<String>>();
-				for (int i = 0; i < nodeArray.length; i++) {
-					System.out.println(nodeArray[i]);
-					conn.sendCommand(Command.KEYS, pattern, nodeArray[i]);
-					keyList = conn.getMultiBulkReply();
-					// System.out.println(strNodeID+":"+keyList.size());
-					resultMap.put(nodeArray[i], keyList);
-				}
-				// conn.close();
-				return resultMap;
-			} else {
-				System.out.println("用户密码错误");
+			String[] nodeArray = clusterNodes();
+			List<String> keyList;
+			resultMap = new HashMap<String, List<String>>();
+			for (int i = 0; i < nodeArray.length; i++) {
+				// System.out.println(nodeArray[i]);
+				conn.sendCommand(Command.KEYS, pattern, nodeArray[i]);
+				keyList = conn.getMultiBulkReply();
+				System.out.println(nodeArray[i]+":"+keyList.size());
+				resultMap.put(nodeArray[i], keyList);
 			}
-		} catch (JedisConnectionException jce) {
-			System.out.println(jce);
+			return resultMap;
+
+		} catch (JedisConnectionException e) {
+			e.printStackTrace();
+			logger.error("get cluster nodes error");
 		}
 		conn.close();
 		return null;
@@ -252,23 +264,14 @@ public class JedisUntils {
 	 * @return 匹配的key集合
 	 */
 	public Map<String, List<Object>> scans() {
-		conn.sendCommand(Command.AUTH, AUTH);
-		String authReply = conn.getStatusCodeReply();
-		if ("ok".equalsIgnoreCase(authReply)) {
-			String[] nodeList = clusterNodes();
-			Map<String, List<Object>> resultMap = new HashMap<String, List<Object>>();
-			for (int i = 0; i < nodeList.length; i++) {
-				System.out.println(nodeList[i]);
-				resultMap.put(nodeList[i], scan(nodeList[i]));
-			}
-			// conn.close();
-			return resultMap;
-		} else {
-			logger.info("用户验证有误！！");
-			System.out.println("用户验证有误！！");
-			conn.close();
-			return null;
+		String[] nodeList = clusterNodes();
+		Map<String, List<Object>> resultMap = new HashMap<String, List<Object>>();
+		for (int i = 0; i < nodeList.length; i++) {
+			// System.out.println(nodeList[i]);
+			resultMap.put(nodeList[i], scan(nodeList[i]));
 		}
+		conn.close();
+		return resultMap;
 	}
 
 	/**
@@ -277,24 +280,15 @@ public class JedisUntils {
 	 * @return 匹配的key集合
 	 */
 	public Map<String, List<Object>> scans(String pattern) {
-		conn.sendCommand(Command.AUTH, AUTH);
-		String authReply = conn.getStatusCodeReply();
-		if ("ok".equalsIgnoreCase(authReply)) {
-			String[] nodeList = clusterNodes();
-			Map<String, List<Object>> resultMap = new HashMap<String, List<Object>>();
-			for (int i = 0; i < nodeList.length; i++) {
-				logger.info("节点ID:" + nodeList[i]);
-				System.out.println(nodeList[i]);
-				resultMap.put(nodeList[i], scan(nodeList[i], pattern));
-			}
-			conn.close();
-			return resultMap;
-		} else {
-			logger.info("用户验证有误！！");
-			System.out.println("用户验证有误！！");
-			conn.close();
-			return null;
+		String[] nodeList = clusterNodes();
+		Map<String, List<Object>> resultMap = new HashMap<String, List<Object>>();
+		for (int i = 0; i < nodeList.length; i++) {
+			logger.info("节点ID:" + nodeList[i]);
+			// System.out.println(nodeList[i]);
+			resultMap.put(nodeList[i], scan(nodeList[i], pattern));
 		}
+		conn.close();
+		return resultMap;
 	}
 
 	/**
@@ -303,24 +297,14 @@ public class JedisUntils {
 	 * @return 匹配的key集合
 	 */
 	public Map<String, List<Object>> scans(int count) {
-
-		conn.sendCommand(Command.AUTH, AUTH);
-		String authReply = conn.getStatusCodeReply();
-		if ("ok".equalsIgnoreCase(authReply)) {
-			String[] nodeList = clusterNodes();
-			Map<String, List<Object>> resultMap = new HashMap<String, List<Object>>();
-			for (int i = 0; i < nodeList.length; i++) {
-				System.out.println(nodeList[i]);
-				resultMap.put(nodeList[i], scan(nodeList[i], count));
-			}
-			conn.close();
-			return resultMap;
-		} else {
-			logger.info("用户验证有误！！");
-			System.out.println("用户验证有误！！");
-			conn.close();
-			return null;
+		String[] nodeList = clusterNodes();
+		Map<String, List<Object>> resultMap = new HashMap<String, List<Object>>();
+		for (int i = 0; i < nodeList.length; i++) {
+			// System.out.println(nodeList[i]);
+			resultMap.put(nodeList[i], scan(nodeList[i], count));
 		}
+		conn.close();
+		return resultMap;
 	}
 
 	/**
@@ -329,25 +313,17 @@ public class JedisUntils {
 	 * @return 匹配的key集合
 	 */
 	public Map<String, List<Object>> scans(String pattern, int count) {
-		conn.sendCommand(Command.AUTH, AUTH);
-		String authReply = conn.getStatusCodeReply();
-		if ("ok".equalsIgnoreCase(authReply)) {
-			conn.sendCommand(Command.CLUSTER, "nodes");
-			String StringNode = conn.getBulkReply();
-			System.out.println("StringNode:" + StringNode);
-			String[] nodeList = clusterNodes();
-			Map<String, List<Object>> resultMap = new HashMap<String, List<Object>>();
-			for (int i = 0; i < nodeList.length; i++) {
-				System.out.println(nodeList[i]);
-				resultMap.put(nodeList[i], scan(nodeList[i], pattern, count));
-			}
-			conn.close();
-			return resultMap;
-		} else {
-			logger.info("用户验证有误！！");
-			System.out.println("用户验证有误！！");
-			return null;
+		conn.sendCommand(Command.CLUSTER, "nodes");
+		String StringNode = conn.getBulkReply();
+		// System.out.println("StringNode:" + StringNode);
+		String[] nodeList = clusterNodes();
+		Map<String, List<Object>> resultMap = new HashMap<String, List<Object>>();
+		for (int i = 0; i < nodeList.length; i++) {
+			// System.out.println(nodeList[i]);
+			resultMap.put(nodeList[i], scan(nodeList[i], pattern, count));
 		}
+		conn.close();
+		return resultMap;
 	}
 
 	/**
@@ -360,13 +336,13 @@ public class JedisUntils {
 	 */
 	private List<Object> scan(String node) {
 		List<Object> result = new ArrayList<Object>();
-		String cursor = ScanParams.SCAN_POINTER_START;
+		String cursor = String.valueOf(0);
 		do {
 			// scan cursor [MATCH pattern] [COUNT count]
 			conn.sendCommand(Command.SCAN, cursor, node);
 			result = conn.getObjectMultiBulkReply();
 			cursor = new String((byte[]) result.get(0));
-			System.out.println(cursor);
+			// System.out.println(cursor);
 			@SuppressWarnings("unchecked")
 			List<byte[]> rawResults = (List<byte[]>) result.get(1);
 			for (byte[] bs : rawResults) {
@@ -387,7 +363,7 @@ public class JedisUntils {
 	 */
 	private List<Object> scan(String node, String pattern) {
 		List<Object> result = new ArrayList<Object>();
-		String cursor = SCAN_POINTER_START;
+		String cursor = String.valueOf(0);
 		List<byte[]> args = new ArrayList<byte[]>();
 		// scan cursor [MATCH pattern] [COUNT count]
 		args.add(SafeEncoder.encode(cursor));
@@ -398,7 +374,7 @@ public class JedisUntils {
 		do {
 			result = conn.getObjectMultiBulkReply();
 			cursor = new String((byte[]) result.get(0));
-			System.out.println(cursor);
+			// System.out.println(cursor);
 			@SuppressWarnings("unchecked")
 			List<byte[]> rawResults = (List<byte[]>) result.get(1);
 			for (byte[] bs : rawResults) {
@@ -409,7 +385,6 @@ public class JedisUntils {
 		} while (!"0".equals(cursor));
 		conn.close();
 		return result;
-
 	}
 
 	/**
@@ -422,7 +397,7 @@ public class JedisUntils {
 	 */
 	private List<Object> scan(String node, int count) {
 		List<Object> result = new ArrayList<Object>();
-		String cursor = SCAN_POINTER_START;
+		String cursor = String.valueOf(0);
 		List<byte[]> args = new ArrayList<byte[]>();
 		// scan cursor [MATCH pattern] [COUNT count]
 		args.add(SafeEncoder.encode(cursor));
@@ -433,7 +408,7 @@ public class JedisUntils {
 		do {
 			result = conn.getObjectMultiBulkReply();
 			cursor = new String((byte[]) result.get(0));
-			System.out.println(cursor);
+			// System.out.println(cursor);
 			@SuppressWarnings("unchecked")
 			List<byte[]> rawResults = (List<byte[]>) result.get(1);
 			for (byte[] bs : rawResults) {
@@ -444,7 +419,6 @@ public class JedisUntils {
 		} while (!"0".equals(cursor));
 		conn.close();
 		return result;
-
 	}
 
 	/**
@@ -457,7 +431,7 @@ public class JedisUntils {
 	 */
 	private List<Object> scan(String node, String pattern, int count) {
 		List<Object> result = new ArrayList<Object>();
-		String cursor = SCAN_POINTER_START;
+		String cursor = String.valueOf(0);
 		List<byte[]> args = new ArrayList<byte[]>();
 		// scan cursor [MATCH pattern] [COUNT count]
 		args.add(SafeEncoder.encode(cursor));

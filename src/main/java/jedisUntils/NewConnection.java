@@ -5,7 +5,7 @@ import redis.clients.jedis.Protocol.Command;
 
 public class NewConnection  extends Connection{
 	public NewConnection() {
-		super("192.168.224.128", 6379);
+		super(FileUntil.FileUntil.getStringProperties(JedisUntils.PATH, "ip"), FileUntil.FileUntil.getIntProperties(JedisUntils.PATH, "port"));
 	}
 	
 	
